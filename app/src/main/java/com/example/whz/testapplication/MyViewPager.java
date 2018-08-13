@@ -1,22 +1,18 @@
 package com.example.whz.testapplication;
 
-import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.support.annotation.ColorRes;
 import android.support.v4.view.ViewPager;
-import android.support.v4.widget.SwipeRefreshLayout;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
-import android.view.animation.Animation;
-import android.view.animation.Transformation;
 import android.widget.Scroller;
 
-import java.util.zip.CheckedOutputStream;
 
 public class MyViewPager extends ViewGroup {
 
@@ -24,9 +20,6 @@ public class MyViewPager extends ViewGroup {
     private Scroller mScroller;
     private State mState;
 
-    private View view0;
-    private View view1;
-    private View view2;
 
 
     public MyViewPager(Context context, AttributeSet attr){
@@ -45,17 +38,28 @@ public class MyViewPager extends ViewGroup {
 //        addView(mBody);
 //        addView(mRight);
 
+
+        View view0;
+        View view1;
+        View view2;
+        View view0copy;
+        View view2copy;
         view0 = new View(context);
         view0.setBackgroundColor(Color.RED);
         view1 = new View(context);
         view1.setBackgroundColor(Color.BLACK);
         view2 = new View(context);
         view2.setBackgroundColor(Color.BLUE);
+        view2copy = new View(context);
+        view2copy.setBackgroundColor(Color.BLUE);
+        view0copy = new View(context);
+        view0copy.setBackgroundColor(Color.RED);
 
+      //  addView(view2copy);
         addView(view0);
         addView(view1);
         addView(view2);
-
+       // addView(view0copy);
 
 
         mScroller = new Scroller(context);
@@ -73,14 +77,27 @@ public class MyViewPager extends ViewGroup {
         }
         else{
             switch(mState){
-                case OVER_TO_NEXT_PAGER:{
+                case OVER_TO_RIGHT_PAGE:{
                     mTotalOffset -= getWidth();
                     View tempView = getChildAt(0);
                     removeViewAt(0);
                     k++;
                     mState = State.RESET;
                     addView(tempView,2);
+                    break;
                 }
+                case OVER_TO_LEFT_PAGE:{
+                    mTotalOffset += getWidth();
+                    View tempView = getChildAt(2);
+                    removeViewAt(2);
+                    k--;
+                    mState = State.RESET;
+                    addView(tempView,0);
+                    break;
+                }
+                case OVER_RESET:
+                    mState = State.RESET;
+                    break;
             }
         }
     }
@@ -110,11 +127,11 @@ public class MyViewPager extends ViewGroup {
         final int childBottom = height - getPaddingBottom();
         final int childTop = getPaddingTop();
         if(mState == State.RESET)
-        for(int i = 0;i<getChildCount();i++){
-            View child = getChildAt(i);
-            child.layout(childLeft + (k + i-1)*with,childTop,(k + i-1)*with+childRight,childBottom);
-            Log.e(TAG,"viewId"+child);
-        }
+            for(int i = 0;i<getChildCount();i++){
+                View child = getChildAt(i);
+                child.layout(childLeft + (k + i-1)*with,childTop,(k + i-1)*with+childRight,childBottom);
+                Log.e(TAG,"viewId"+child);
+            }
     }
 
     private static final String TAG  = "MyViewPager";
@@ -138,6 +155,12 @@ public class MyViewPager extends ViewGroup {
 
         int action =  event.getActionMasked();
         int pointerIndex;
+
+        Log.e(TAG,"mScroller.isFinished"+mScroller.isFinished());
+//        if(!mScroller.isFinished())
+//            mScroller.abortAnimation();
+
+
         switch (action){
             case MotionEvent.ACTION_DOWN: {
                 Log.e(TAG,"I_ACTION_DOWN");
@@ -157,8 +180,8 @@ public class MyViewPager extends ViewGroup {
                     return false;
                 float x = event.getX(pointerIndex);
                 Log.e(TAG,"x"+x);
-                if (x - mDownX > mTouchSlop && !mIsDragging) {
-                    mMotionX = mDownX + mTouchSlop;
+                if (Math.abs(x - mDownX) > mTouchSlop && !mIsDragging) {
+                    mMotionX = x- mDownX < 0 ?mDownX - mTouchSlop : mDownX + mTouchSlop;
                     mIsDragging = true;
                 }
                 break;
@@ -174,10 +197,6 @@ public class MyViewPager extends ViewGroup {
 
     @Override
     public void dispatchDraw(Canvas canvas){
-        //Log.e(TAG,"dispatchDraw");
-        //super.dispatchDraw(canvas);
-        //nextView.draw(canvas);
-
         super.dispatchDraw(canvas);
     }
 
@@ -186,6 +205,12 @@ public class MyViewPager extends ViewGroup {
         Log.e(TAG,"onTouchEvent");
         int action = event.getActionMasked();
         int pointIndex;
+
+        if(!mScroller.isFinished()){
+            mScroller.abortAnimation();
+        }
+
+
         switch (action){
             case MotionEvent.ACTION_MOVE:
                 Log.e(TAG,"ACTION_MOVE");
@@ -195,13 +220,13 @@ public class MyViewPager extends ViewGroup {
                 Log.e(TAG,"x"+x);
                 Log.e(TAG,"mDownX"+mDownX);
                 if (Math.abs(x - mDownX) > mTouchSlop && !mIsDragging) {
-                    mMotionX = mDownX - mTouchSlop;
+                    mMotionX = x- mDownX < 0 ?mDownX - mTouchSlop : mDownX + mTouchSlop;
                     mIsDragging = true;
                 }
 
                 if(mIsDragging){
-                    mState = State.PULL_RIGHT;
-                    Log.e(TAG,"mMotionX"+mMotionX);
+                    Log.e(TAG,"mTotalOffset"+mTotalOffset);
+                    mState =  x- mDownX < 0 ? State.PULL_LEFT:State.PULL_RIGHT;
                     float over = (x - mMotionX) + mTotalOffset;
                     scrollTo(-(int)over,0);
                     mOffset = (x-mMotionX);
@@ -213,19 +238,20 @@ public class MyViewPager extends ViewGroup {
                     mIsDragging = false;
                     Log.e(TAG,"getWidth"+getWidth());
                     if(Math.abs(mOffset) > getWidth()/2){
-                        if(mOffset < 0){
-                            mState = State.OVER_TO_NEXT_PAGER;
-                            mScroller.startScroll(getScrollX(),0,getWidth()+(int)mOffset,0);
-                            invalidate();
+                        if(mState == State.PULL_LEFT){
+                            mState = State.OVER_TO_RIGHT_PAGE;
+                            mScroller.startScroll(getScrollX(),0,getWidth()-(int)Math.abs(mOffset),0);
                         }
-                        else{
-//                            View tempView = getChildAt(2);
-//                            removeViewAt(2);
-//                            addView(tempView,0);
+                        else {
+                            mState = State.OVER_TO_LEFT_PAGE;
+                            mScroller.startScroll(getScrollX(),0,-(getWidth()-(int)Math.abs(mOffset)),0);
                         }
+                        invalidate();
                     }
                     else{
-                        //requestLayout();
+                        mState = State.OVER_RESET;
+                        mScroller.startScroll(getScrollX(),0,(int)mOffset,0);
+                        invalidate();
                     }
                 }
                 return true;
