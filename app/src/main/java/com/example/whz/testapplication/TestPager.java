@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.support.v4.view.ViewPager;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -17,27 +18,25 @@ import java.util.List;
 
 public class TestPager extends ViewGroup {
     private Scroller mScroller;
-    private State mState;
+
     private VelocityTracker mVelocityTracker;
-    private int mMaxVelocity;
+
     private static final String TAG  = "TestPager";
     private float mDownX;
     private float mMotionX;
-    private int mTouchSlop;
+    private float mPointerOffset;
     private float mCurPageOffset;
     private float mTotalPagerOffset;
-    private float mPointerOffset;
-    private int k;
+    private int mTouchSlop;
+    private int mMaxVelocity;
+    private int mRagerOffsetNum;
     private int mActivePointerId;
-
     private int mPagerCount;
-
     private int mLeftPos;
     private int mRightPos;
-
+    private boolean mIsOvering;
     private boolean mIsDragging;
 
-    private MyPagerAdapter mAdapter;
 
     private List<View> mViewList;
 
@@ -49,20 +48,15 @@ public class TestPager extends ViewGroup {
         mMaxVelocity = ViewConfiguration.get(context).getScaledMaximumFlingVelocity();
         mScroller = new Scroller(context);
 
-        k = 0;
-        mState = State.RESET;
+        mRagerOffsetNum = 0;
+        mIsOvering = false;
         mIsDragging = false;
-
         mPointerOffset = 0;
         mCurPageOffset = 0;
         mTotalPagerOffset = 0;
     }
 
 
-    public void setAdapter(MyPagerAdapter pagerAdapter){
-        this.mAdapter = pagerAdapter;
-        this.mPagerCount = mAdapter.getCount();
-    }
 
 
     public void setViewList(List<View> list){
@@ -83,21 +77,14 @@ public class TestPager extends ViewGroup {
 
     @Override
     public void computeScroll(){
-        Log.e(TAG,"mState"+mState);
         if(mScroller.computeScrollOffset()){
             scrollTo(mScroller.getCurrX(),mScroller.getCurrY());
             invalidate();
         }
         else{
-            Log.e(TAG,"GetScrollX"+getScrollX());
-            switch(mState){
-                case OVER_TO_RIGHT_PAGE:
-                case OVER_TO_LEFT_PAGE:
-                case OVER_RESET:
-                    mIsDragging = false;
-                    mState = State.RESET;
-                    mPointerOffset = 0;
-                    break;
+            if(mIsOvering){
+                mIsDragging = false;
+                mIsOvering = false;
             }
         }
     }
@@ -124,10 +111,9 @@ public class TestPager extends ViewGroup {
         final int childRight = with - getPaddingRight();
         final int childBottom = height - getPaddingBottom();
         final int childTop = getPaddingTop();
-        Log.e(TAG,"mState"+mState);
         for(int i = 0;i<getChildCount();i++){
             View child = getChildAt(i);
-            child.layout(childLeft + (k + i-1)*with,childTop,(k + i-1)*with+childRight,childBottom);
+            child.layout(childLeft + (mRagerOffsetNum + i-1)*with,childTop,(mRagerOffsetNum + i-1)*with+childRight,childBottom);
             Log.e(TAG,"viewId"+child);
         }
     }
@@ -153,10 +139,10 @@ public class TestPager extends ViewGroup {
                 mActivePointerId = event.getPointerId(0);
                 pointerIndex = event.findPointerIndex(mActivePointerId);
                 mDownX = event.getX(pointerIndex);
-                mTotalPagerOffset = -k*getWidth();
+                mTotalPagerOffset = -mRagerOffsetNum*getWidth();
                 mCurPageOffset =  mIsDragging ? -(getScrollX() + mTotalPagerOffset):getScrollX() + mTotalPagerOffset;
                 mPointerOffset = 0;
-                mState = State.RESET;
+                mIsOvering = false;
                 if(mIsDragging)
                     mMotionX = mDownX;
 
@@ -165,15 +151,11 @@ public class TestPager extends ViewGroup {
             case MotionEvent.ACTION_MOVE: {
                 Log.e(TAG,"I_ACTION_MOVE");
                 pointerIndex = event.findPointerIndex(mActivePointerId);
-                //Log.e(TAG,"pointerIndex"+pointerIndex);
                 if (pointerIndex < 0)
                     return false;
                 float x = event.getX(pointerIndex);
                 Log.e(TAG,"x"+x);
-                if (Math.abs(x - mDownX) > mTouchSlop && !mIsDragging) {
-                    mMotionX = x- mDownX < 0 ?mDownX - mTouchSlop : mDownX + mTouchSlop;
-                    mIsDragging = true;
-                }
+                startDrag(x);
                 break;
             }
             case MotionEvent.ACTION_POINTER_DOWN:{
@@ -239,61 +221,41 @@ public class TestPager extends ViewGroup {
 
         switch (action){
             case MotionEvent.ACTION_DOWN:
+                mActivePointerId = event.getPointerId(0);
+                mTotalPagerOffset = -mRagerOffsetNum*getWidth();
+                mCurPageOffset =  mIsDragging ? -(getScrollX() + mTotalPagerOffset):getScrollX() + mTotalPagerOffset;
+                mPointerOffset = 0;
+                mIsOvering = false;
                 break;
             case MotionEvent.ACTION_MOVE: {
                 Log.e(TAG, "ACTION_MOVE");
                 pointIndex = event.findPointerIndex(mActivePointerId);
-                if(pointIndex < 0)
+                if (pointIndex < 0)
                     return false;
 
                 final float x = event.getX(pointIndex);
                 Log.e(TAG, "x" + x);
                 Log.e(TAG, "mDownX" + mDownX);
-                if (Math.abs(x - mDownX) > mTouchSlop && !mIsDragging) {
-                    mMotionX = x - mDownX < 0 ? mDownX - mTouchSlop : mDownX + mTouchSlop;
-                    mIsDragging = true;
-                }
+                startDrag(x);
 
                 if (mIsDragging) {
                     float oldPointerOffset = mPointerOffset;
                     mPointerOffset = x - mMotionX;
                     mCurPageOffset = mPointerOffset - oldPointerOffset + mCurPageOffset;
+                    Log.e(TAG, "oldPointerOffset" + oldPointerOffset);
+                    Log.e(TAG, "mCurPageOffset" + mCurPageOffset);
+                    Log.e(TAG, "mPointerOffset" + mPointerOffset);
 
-                    mState = mCurPageOffset < 0 ? State.PULL_LEFT:State.PULL_RIGHT;
-
-                    Log.e(TAG,"oldPointerOffset"+oldPointerOffset);
-                    Log.e(TAG,"mCurPageOffset"+mCurPageOffset);
-                    Log.e(TAG,"mPointerOffset"+mPointerOffset);
-
-                    if(mCurPageOffset > getWidth()/2) {
-                        if(mCurPageOffset > getWidth()){
-                            mRightPos = (mRightPos - 1 + mPagerCount) % mPagerCount;
-                            mLeftPos = (mLeftPos - 1 + mPagerCount) % mPagerCount;
-
-                            View view = mViewList.get(mLeftPos);
-                            //View tempView = getChildAt(4);
-                            removeViewAt(2);
-                            k--;
-                            addView(view,0);
-                            mCurPageOffset -= getWidth();
-                            mTotalPagerOffset = -k*getWidth();
-                        }
+                    if (mCurPageOffset > getWidth()) {
+                        pullRightChangeViewOrder();
+                        mCurPageOffset -= getWidth();
+                        mTotalPagerOffset = -mRagerOffsetNum * getWidth();
+                    } else if (mCurPageOffset < -getWidth()) {
+                        pullLeftChangeViewOrder();
+                        mCurPageOffset += getWidth();
+                        mTotalPagerOffset = -mRagerOffsetNum * getWidth();
                     }
-                    else if(mCurPageOffset < -getWidth()/2){
-                        if(mCurPageOffset < -getWidth()){
-                            mRightPos = (mRightPos + 1) % mPagerCount;
-                            mLeftPos = (mLeftPos + 1) % mPagerCount;
-                            View view = mViewList.get(mRightPos);
-                            removeViewAt(0);
-                            k++;
-                            addView(view,2);
-                            mCurPageOffset += getWidth();
-                            mTotalPagerOffset = -k*getWidth();
-                        }
-                    }
-
-                    scrollTo(-(int)(mCurPageOffset + mTotalPagerOffset),0);
-
+                    scrollTo(-(int) (mCurPageOffset + mTotalPagerOffset), 0);
                 }
                 break;
             }
@@ -324,36 +286,22 @@ public class TestPager extends ViewGroup {
                     velocityTracker.computeCurrentVelocity(1000,mMaxVelocity);
                     int initialVelocity = (int) velocityTracker.getXVelocity(mActivePointerId);
 
-
                     if(Math.abs(mCurPageOffset) > getWidth()/2 || Math.abs(initialVelocity) > 4000){
                         if(mCurPageOffset > getWidth()/2 || initialVelocity > 4000) {
-                            mState = State.OVER_TO_LEFT_PAGE;
-                            mRightPos = (mRightPos - 1 + mPagerCount) % mPagerCount;
-                            mLeftPos = (mLeftPos - 1 + mPagerCount) % mPagerCount;
-                            View view = mViewList.get(mLeftPos);
-                            //View tempView = getChildAt(4);
-                            removeViewAt(2);
-                            k--;
-                            addView(view,0);
+                            pullRightChangeViewOrder();
+                            mIsOvering = true;
                             mScroller.startScroll(getScrollX(), 0, -(getWidth() - (int)mCurPageOffset), 0);
                             invalidate();
                         }
                         else{
-                            mState = State.OVER_TO_RIGHT_PAGE;
-                            mRightPos = (mRightPos + 1) % mPagerCount;
-                            mLeftPos = (mLeftPos + 1) % mPagerCount;
-
-                            //View tempView = getChildAt(0);
-                            View view = mViewList.get(mRightPos);
-                            removeViewAt(0);
-                            k++;
-                            addView(view,2);
+                            pullLeftChangeViewOrder();
+                            mIsOvering = true;
                             mScroller.startScroll(getScrollX(),0,getWidth() + (int)mCurPageOffset,0);
                             invalidate();
                         }
                     }
                     else{
-                        mState = State.OVER_RESET;
+                        mIsOvering = true;
                         mScroller.startScroll(getScrollX(),0,(int)mCurPageOffset,0);
                         invalidate();
                     }
@@ -362,6 +310,31 @@ public class TestPager extends ViewGroup {
             }
         }
         return true;
+    }
+
+    private void startDrag(float x) {
+        if (Math.abs(x - mDownX) > mTouchSlop && !mIsDragging) {
+            mMotionX = x - mDownX < 0 ? mDownX - mTouchSlop : mDownX + mTouchSlop;
+            mIsDragging = true;
+        }
+    }
+
+    private void pullLeftChangeViewOrder() {
+        mRightPos = (mRightPos + 1) % mPagerCount;
+        mLeftPos = (mLeftPos + 1) % mPagerCount;
+        View view = mViewList.get(mRightPos);
+        removeViewAt(0);
+        mRagerOffsetNum++;
+        addView(view, 2);
+    }
+
+    private void pullRightChangeViewOrder() {
+        mRightPos = (mRightPos - 1 + mPagerCount) % mPagerCount;
+        mLeftPos = (mLeftPos - 1 + mPagerCount) % mPagerCount;
+        View view = mViewList.get(mLeftPos);
+        removeViewAt(2);
+        mRagerOffsetNum--;
+        addView(view, 0);
     }
 
 

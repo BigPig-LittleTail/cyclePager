@@ -9,21 +9,34 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.ImageView;
+import android.widget.ListView;
 
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
     private TestPager mTestPager;
-    Handler mHandler = new Handler();
     private ArrayList<View> test = new ArrayList<>();
-    private ArrayList<Integer> colors = new ArrayList<>();
+    private ListView listView;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mTestPager = findViewById(R.id.myViewPager);
+
+        listView = new ListView(mTestPager.getContext());
+
+        ArrayList<Integer> test1 = new ArrayList<>();
+        for(int i = 0;i<20;i++){
+            test1.add(i);
+        }
+
+        ArrayAdapter<Integer> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_list_item_1, test1);
+
+        listView.setAdapter(adapter);
 
         View view0;
         View view1;
@@ -43,8 +56,9 @@ public class MainActivity extends AppCompatActivity {
 
         test.add(view0);
         test.add(view1);
+        test.add(listView);
         test.add(view2);
-//        test.add(view3);
+        test.add(view3);
 //        test.add(view4);
 
         mTestPager.setViewList(test);
