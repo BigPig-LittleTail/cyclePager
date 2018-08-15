@@ -17,30 +17,37 @@ import android.widget.Scroller;
 import java.security.acl.LastOwnerException;
 
 
+
+
 public class MyViewPager extends ViewGroup {
 
+
+    public enum  State {
+        RESET,PULL_LEFT,PULL_RIGHT,OVER_TO_RIGHT_PAGE,OVER_TO_LEFT_PAGE,OVER_RESET
+    }
 
     private Scroller mScroller;
     private State mState;
     private VelocityTracker mVelocityTracker;
     private int mMaxVelocity;
 
+    private static final String TAG  = "MyViewPager";
+    private float mDownX;
+    private float mMotionX;
+    private int mTouchSlop;
+    private float mCurPageOffset;
+    private float mTotalOffset = 0;
+    private float mPointerOffset;
+
+    private int k;
+    private int mActivePointerId;
+    private boolean mIsDragging;
+
+    private MyPagerAdapter mAdapter;
+
     public MyViewPager(Context context, AttributeSet attr){
         super(context,attr);
         mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
-//        View mBody;
-//        View mLeft;
-//        View mRight;
-//        mLeft = new View(context);
-//        mLeft.setBackgroundColor(Color.RED);
-//        mBody = new View(context);
-//        mBody.setBackgroundColor(Color.BLACK);
-//        mRight = new View(context);
-//        mRight.setBackgroundColor(Color.BLUE);
-//        addView(mLeft);
-//        addView(mBody);
-//        addView(mRight);
-
 
         View view0;
         View view1;
@@ -57,20 +64,22 @@ public class MyViewPager extends ViewGroup {
         view2copy.setBackgroundColor(Color.BLUE);
         view0copy = new View(context);
         view0copy.setBackgroundColor(Color.RED);
-
-      //  addView(view2copy);
         addView(view0);
         addView(view1);
         addView(view2);
-       // addView(view0copy);
 
         mMaxVelocity = ViewConfiguration.get(context).getScaledMaximumFlingVelocity();
         mScroller = new Scroller(context);
 
         k = 0;
-        mOffset = 0;
+        mCurPageOffset = 0;
         mState = State.RESET;
         mIsDragging = false;
+    }
+
+
+    public void setAdapter(MyPagerAdapter pagerAdapter){
+        this.mAdapter = pagerAdapter;
     }
 
     @Override
@@ -83,24 +92,12 @@ public class MyViewPager extends ViewGroup {
         else{
             Log.e(TAG,"GetScrollX"+getScrollX());
             switch(mState){
-                case OVER_TO_RIGHT_PAGE:{
-                    mIsDragging = false;
-                    mOffset = 0;
-                    mTotalOffset  = -getScrollX();
-                    mState = State.RESET;
-                    break;
-                }
-                case OVER_TO_LEFT_PAGE:{
-                    mIsDragging = false;
-                    mOffset = 0;
-                    mTotalOffset = -getScrollX();
-                    mState = State.RESET;
-                    break;
-                }
+                case OVER_TO_RIGHT_PAGE:
+                case OVER_TO_LEFT_PAGE:
                 case OVER_RESET:
-                    mTotalOffset = -getScrollX();
                     mIsDragging = false;
-                    mOffset = 0;
+                    mCurPageOffset = 0;
+                    mTotalOffset  = -getScrollX();
                     mState = State.RESET;
                     break;
             }
@@ -132,25 +129,13 @@ public class MyViewPager extends ViewGroup {
         final int childBottom = height - getPaddingBottom();
         final int childTop = getPaddingTop();
         Log.e(TAG,"mState"+mState);
-        if(mState == State.RESET || mState == State.OVER_TO_RIGHT_PAGE || mState == State.OVER_TO_LEFT_PAGE || mState == State.OVER_RESET)
+        //if(mState == State.RESET || mState == State.OVER_TO_RIGHT_PAGE || mState == State.OVER_TO_LEFT_PAGE || mState == State.OVER_RESET)
             for(int i = 0;i<getChildCount();i++){
                 View child = getChildAt(i);
                 child.layout(childLeft + (k + i-1)*with,childTop,(k + i-1)*with+childRight,childBottom);
                 Log.e(TAG,"viewId"+child);
             }
     }
-
-    private static final String TAG  = "MyViewPager";
-    private float mDownX;
-    private float mMotionX;
-    private int mTouchSlop;
-    private float mOffset;
-    private float mTotalOffset = 0;
-    private int k;
-    private int mActivePointerId;
-    private boolean mIsDragging;
-
-
 
 
     @Override
@@ -161,8 +146,6 @@ public class MyViewPager extends ViewGroup {
         int pointerIndex;
 
         Log.e(TAG,"mScroller.isFinished"+mScroller.isFinished());
-//        if(!mScroller.isFinished())
-//            mScroller.abortAnimation();
 
         if(!mScroller.isFinished()){
             mScroller.abortAnimation();
@@ -178,8 +161,9 @@ public class MyViewPager extends ViewGroup {
                 mDownX = event.getX(pointerIndex);
                 //mIsDragging = false;
                 mTotalOffset = -getScrollX();
-                mOffset = -getScrollX() + k *getWidth();
-                Log.e(TAG,"mOffset"+mOffset);
+                mCurPageOffset = -getScrollX() + k *getWidth();
+                mPointerOffset = 0;
+                Log.e(TAG,"mCurPageOffset"+mCurPageOffset);
                 mState = State.RESET;
                 if(mIsDragging)
                     mMotionX = mDownX;
@@ -198,6 +182,21 @@ public class MyViewPager extends ViewGroup {
                     mMotionX = x- mDownX < 0 ?mDownX - mTouchSlop : mDownX + mTouchSlop;
                     mIsDragging = true;
                 }
+                break;
+            }
+            case MotionEvent.ACTION_POINTER_DOWN:{
+                pointerIndex = event.getActionIndex();
+                if(pointerIndex < 0)
+                    return false;
+                mActivePointerId = event.getPointerId(pointerIndex);
+
+                mDownX = event.getX(pointerIndex);
+                if(mIsDragging)
+                    mMotionX = mDownX;
+                break;
+            }
+            case MotionEvent.ACTION_POINTER_UP:{
+                onSecondPointerUp(event);
                 break;
             }
             case MotionEvent.ACTION_CANCEL:
@@ -220,6 +219,21 @@ public class MyViewPager extends ViewGroup {
         super.dispatchDraw(canvas);
     }
 
+    private void onSecondPointerUp(MotionEvent event){
+        int pointIndex = event.getActionIndex();
+        int pointId = event.getPointerId(pointIndex);
+        if(pointId == mActivePointerId){
+            int nowPointIndex = pointIndex == 0 ? 1:0;
+            mActivePointerId = event.getPointerId(nowPointIndex);
+
+            mTotalOffset += mPointerOffset;
+            mCurPageOffset += mPointerOffset;
+            mPointerOffset = 0;
+            mMotionX = mDownX = event.getX(nowPointIndex);
+
+        }
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event){
         Log.e(TAG,"onTouchEvent");
@@ -227,10 +241,6 @@ public class MyViewPager extends ViewGroup {
         int pointIndex;
 
         Log.e(TAG,"mScroller.isFinished"+mScroller.isFinished());
-//        if(!mScroller.isFinished()){
-//            mScroller.abortAnimation();
-//            mTotalOffset = -getScrollX();
-//        }
 
         if(mVelocityTracker == null)
         {
@@ -240,10 +250,15 @@ public class MyViewPager extends ViewGroup {
         mVelocityTracker.addMovement(event);
 
         switch (action){
+            case MotionEvent.ACTION_DOWN:
+                break;
             case MotionEvent.ACTION_MOVE: {
                 Log.e(TAG, "ACTION_MOVE");
                 pointIndex = event.findPointerIndex(mActivePointerId);
                 //Log.e(TAG,"mActivePointerId"+mActivePointerId);
+                if(pointIndex < 0)
+                    return false;
+
                 float x = event.getX(pointIndex);
                 Log.e(TAG, "x" + x);
                 Log.e(TAG, "mDownX" + mDownX);
@@ -252,16 +267,52 @@ public class MyViewPager extends ViewGroup {
                     mIsDragging = true;
                 }
 
-
                 if (mIsDragging) {
                     Log.e(TAG, "mTotalOffset" + mTotalOffset);
                     Log.e(TAG,"mMotionX"+mMotionX);
-                    mState = (x - mMotionX) + mOffset < 0 ? State.PULL_LEFT : State.PULL_RIGHT;
+                    mPointerOffset = (x - mMotionX);
+                    mState = mPointerOffset + mCurPageOffset < 0 ? State.PULL_LEFT : State.PULL_RIGHT;
                     float over = (x - mMotionX) + mTotalOffset;
                     scrollTo(-(int) over, 0);
-
+                    if(over + k*getWidth() > getWidth()/2 && over > 0) {
+                        View tempView = getChildAt(2);
+                        removeViewAt(2);
+                        k--;
+                        addView(tempView,0);
+                    }
+                    else if(over + k*getWidth() < -getWidth()/2 && over < 0){
+                        View tempView = getChildAt(0);
+                        removeViewAt(0);
+                        k++;
+                        addView(tempView,2);
+                    }
                 }
-                return true;
+                break;
+            }
+            case MotionEvent.ACTION_POINTER_DOWN:{
+                Log.e(TAG,"ACTION_POINTER_DOWN");
+                pointIndex = event.getActionIndex();
+                if(pointIndex < 0)
+                    return false;
+                mActivePointerId = event.getPointerId(pointIndex);
+                
+                float x = event.getX(pointIndex);
+
+                mTotalOffset += mPointerOffset;
+                mCurPageOffset += mPointerOffset;
+
+                mDownX = mMotionX = x;
+                Log.e(TAG, "mTotalOffset" + mTotalOffset);
+                Log.e(TAG,"mMotionX"+mMotionX);
+                Log.e(TAG,"mCurPageOffset"+mCurPageOffset);
+                break;
+
+            }
+            case MotionEvent.ACTION_POINTER_UP:{
+                Log.e(TAG,"ACTION_POINTER_UP");
+                onSecondPointerUp(event);
+                Log.e(TAG, "mTotalOffset" + mTotalOffset);
+                break;
             }
             case MotionEvent.ACTION_UP: {
                 Log.e(TAG, "ACTION_UP");
@@ -271,27 +322,25 @@ public class MyViewPager extends ViewGroup {
                     int initialVelocity = (int) velocityTracker.getXVelocity(mActivePointerId);
                     Log.e(TAG,"initialVelocity"+initialVelocity);
 
-
                     pointIndex = event.findPointerIndex(mActivePointerId);
                     float x = event.getX(pointIndex);
-                    mOffset =(x - mMotionX) + mOffset;
-                    Log.e(TAG,"mOffset"+mOffset);
-                    if (Math.abs(mOffset) > getWidth() / 2) {
+                    mCurPageOffset = mPointerOffset + mCurPageOffset;
+                    float over = (x - mMotionX) + mTotalOffset;
+                    Log.e(TAG,"mCurPageOffset"+mCurPageOffset);
+                    if (Math.abs(mCurPageOffset) > getWidth() / 2) {
                         if (mState == State.PULL_LEFT) {
-                            View tempView = getChildAt(0);
-                            removeViewAt(0);
-                            k++;
-                            mState = State.OVER_TO_RIGHT_PAGE;
-                            addView(tempView,2);
-                            mScroller.startScroll(getScrollX(), 0, getWidth() - (int) Math.abs(mOffset), 0);
+
+                            mCurPageOffset = over + k*getWidth();
+                            mScroller.startScroll(getScrollX(), 0, (int)mCurPageOffset, 0);
 
                         } else {
-                            View tempView = getChildAt(2);
-                            removeViewAt(2);
-                            k--;
-                            mState = State.OVER_TO_LEFT_PAGE;
-                            addView(tempView,0);
-                            mScroller.startScroll(getScrollX(), 0, -(getWidth() - (int) Math.abs(mOffset)), 0);
+//                            View tempView = getChildAt(2);
+//                            removeViewAt(2);
+//                            k--;
+//                            mState = State.OVER_TO_LEFT_PAGE;
+//                            addView(tempView,0);
+                            mCurPageOffset = over + k*getWidth();
+                            mScroller.startScroll(getScrollX(), 0, (int)mCurPageOffset, 0);
                         }
                         invalidate();
                     } else {
@@ -302,7 +351,7 @@ public class MyViewPager extends ViewGroup {
                                 k++;
                                 mState = State.OVER_TO_RIGHT_PAGE;
                                 addView(tempView,2);
-                                mScroller.startScroll(getScrollX(), 0, getWidth() - (int) Math.abs(mOffset), 0);
+                                mScroller.startScroll(getScrollX(), 0, getWidth() - (int) Math.abs(mCurPageOffset), 0);
 
                             } else {
                                 View tempView = getChildAt(2);
@@ -310,20 +359,20 @@ public class MyViewPager extends ViewGroup {
                                 k--;
                                 mState = State.OVER_TO_LEFT_PAGE;
                                 addView(tempView,0);
-                                mScroller.startScroll(getScrollX(), 0, -(getWidth() - (int) Math.abs(mOffset)), 0);
+                                mScroller.startScroll(getScrollX(), 0, -(getWidth() - (int) Math.abs(mCurPageOffset)), 0);
                             }
                             invalidate();
                         }
                         else {
                             mState = State.OVER_RESET;
                             //requestLayout();
-                            mScroller.startScroll(getScrollX(), 0, (int) mOffset, 0);
+                            mScroller.startScroll(getScrollX(), 0, (int) mCurPageOffset, 0);
                             invalidate();
                         }
                     }
                     velocityTracker.clear();
                 }
-                return true;
+                break;
             }
         }
         return true;
