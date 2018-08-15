@@ -44,8 +44,8 @@ public class MainActivity extends AppCompatActivity {
         test.add(view0);
         test.add(view1);
         test.add(view2);
-        test.add(view3);
-        test.add(view4);
+//        test.add(view3);
+//        test.add(view4);
 
         mTestPager.setViewList(test);
 

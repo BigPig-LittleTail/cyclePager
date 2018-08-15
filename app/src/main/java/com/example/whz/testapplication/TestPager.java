@@ -71,12 +71,12 @@ public class TestPager extends ViewGroup {
         if(mViewList == null)
             mViewList = list;
         mPagerCount = mViewList.size();
-        if(mPagerCount >= 5){
-            for(int i = 0;i<5;i++){
+        if(mPagerCount >= 3){
+            for(int i = 0;i<3;i++){
                 addView(list.get(i));
             }
             mLeftPos = 0;
-            mRightPos = 4;
+            mRightPos = 2;
         }
     }
 
@@ -127,7 +127,7 @@ public class TestPager extends ViewGroup {
         Log.e(TAG,"mState"+mState);
         for(int i = 0;i<getChildCount();i++){
             View child = getChildAt(i);
-            child.layout(childLeft + (k + i-2)*with,childTop,(k + i-2)*with+childRight,childBottom);
+            child.layout(childLeft + (k + i-1)*with,childTop,(k + i-1)*with+childRight,childBottom);
             Log.e(TAG,"viewId"+child);
         }
     }
@@ -272,7 +272,7 @@ public class TestPager extends ViewGroup {
 
                             View view = mViewList.get(mLeftPos);
                             //View tempView = getChildAt(4);
-                            removeViewAt(4);
+                            removeViewAt(2);
                             k--;
                             addView(view,0);
                             mCurPageOffset -= getWidth();
@@ -286,7 +286,7 @@ public class TestPager extends ViewGroup {
                             View view = mViewList.get(mRightPos);
                             removeViewAt(0);
                             k++;
-                            addView(view,4);
+                            addView(view,2);
                             mCurPageOffset += getWidth();
                             mTotalPagerOffset = -k*getWidth();
                         }
@@ -332,7 +332,7 @@ public class TestPager extends ViewGroup {
                             mLeftPos = (mLeftPos - 1 + mPagerCount) % mPagerCount;
                             View view = mViewList.get(mLeftPos);
                             //View tempView = getChildAt(4);
-                            removeViewAt(4);
+                            removeViewAt(2);
                             k--;
                             addView(view,0);
                             mScroller.startScroll(getScrollX(), 0, -(getWidth() - (int)mCurPageOffset), 0);
@@ -347,7 +347,7 @@ public class TestPager extends ViewGroup {
                             View view = mViewList.get(mRightPos);
                             removeViewAt(0);
                             k++;
-                            addView(view,4);
+                            addView(view,2);
                             mScroller.startScroll(getScrollX(),0,getWidth() + (int)mCurPageOffset,0);
                             invalidate();
                         }
