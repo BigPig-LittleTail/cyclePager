@@ -14,7 +14,7 @@ import android.view.ViewGroup;
 
 import java.util.List;
 
-public class TestPager extends ViewGroup {
+public class MyBetterPager extends ViewGroup {
     private VelocityTracker mVelocityTracker;
 
     private static final String TAG  = "TestPager";
@@ -41,7 +41,7 @@ public class TestPager extends ViewGroup {
 
     private List<View> mViewList;
 
-    public TestPager(Context context, AttributeSet attr){
+    public MyBetterPager(Context context, AttributeSet attr){
         super(context,attr);
         mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
 
@@ -233,7 +233,7 @@ public class TestPager extends ViewGroup {
 
     @Override
     public void dispatchDraw(Canvas canvas){
-        if(mShowCount >= 3){
+        if(mPagerCount >= 2){
             if(mState == State.RESET)
             {
                 super.dispatchDraw(canvas);
@@ -247,21 +247,7 @@ public class TestPager extends ViewGroup {
                 super.dispatchDraw(canvas);
             }
         }
-        else if(mShowCount == 2){
-            if(mState == State.RESET)
-            {
-                super.dispatchDraw(canvas);
-            }
-            else if(mState == State.PULL_LEFT){
-                canvas.translate(mCurPageOffset,0);
-                super.dispatchDraw(canvas);
-            }
-            else if(mState == State.PULL_RIGHT){
-                canvas.translate(mCurPageOffset,0);
-                super.dispatchDraw(canvas);
-            }
-        }
-        else if(mShowCount == 1){
+        else if(mPagerCount == 1){
             if(mState == State.RESET)
             {
                 super.dispatchDraw(canvas);
@@ -337,12 +323,13 @@ public class TestPager extends ViewGroup {
                     mPointerOffset = x - mMotionX;
                     mCurPageOffset = mPointerOffset - oldPointerOffset + mCurPageOffset;
                     mState = mCurPageOffset < 0 ? State.PULL_LEFT:State.PULL_RIGHT;
+
                     Log.e(TAG,"mMotionX"+mMotionX);
                     Log.e(TAG, "oldPointerOffset" + oldPointerOffset);
                     Log.e(TAG, "mCurPageOffset" + mCurPageOffset);
                     Log.e(TAG, "mPointerOffset" + mPointerOffset);
 
-                    if(mShowCount == 2 && oldState != mState){
+                    if(mPagerCount == 2 && oldState != mState){
                         if(oldState == State.RESET)
                         {
                             addView(mViewList.get(mLeftPos));
@@ -422,13 +409,14 @@ public class TestPager extends ViewGroup {
                     int initialVelocity = (int) velocityTracker.getXVelocity(mActivePointerId);
 
                     Log.e(TAG,"initialVelocity"+initialVelocity);
-
-                    if(Math.abs(mCurPageOffset) > getWidth()/2 || Math.abs(initialVelocity) > 4000){
-                        boolean quickScroll = Math.abs(initialVelocity) > 4000;
+                    boolean quickScroll = Math.abs(initialVelocity) > 4000;
+                    if((mCurPageOffset > 0 && initialVelocity > 4000) || (mCurPageOffset < 0 && initialVelocity <-4000)
+                            || (mCurPageOffset > getWidth()/2 && initialVelocity < 4000 && initialVelocity > 0)
+                            || (mCurPageOffset <- getWidth()/2 && initialVelocity>-4000 && initialVelocity < 0)) {
                         startAnimation(true,quickScroll);
                     }
                     else{
-                        startAnimation(false,false);
+                        startAnimation(false,quickScroll);
                     }
                 }
                 break;
@@ -449,6 +437,15 @@ public class TestPager extends ViewGroup {
                     invalidate();
                 }
             });
+
+            animation.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    super.onAnimationStart(animation);
+                }
+            });
+
+
             animation.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
@@ -487,7 +484,6 @@ public class TestPager extends ViewGroup {
                                 removeViewAt(0);
                             }
                         }
-
                         mCurPageOffset = 0;
                     }
                 }
@@ -519,16 +515,26 @@ public class TestPager extends ViewGroup {
                                 removeViewAt(1);
                             }
                         }
-
                     }
                 }
             });
         }
 
         long animationTime;
-        animationTime = quickScroll?
-                (long)(1000 * ((getWidth() - Math.abs(mCurPageOffset)))/getWidth())
-                :(long) (1000 * Math.min((getWidth() - Math.abs(mCurPageOffset)),Math.abs(mCurPageOffset))/getWidth());
+        //animationTime = (long) (1000 * Math.min((getWidth() - Math.abs(mCurPageOffset)),Math.abs(mCurPageOffset))/getWidth());
+
+        if(quickScroll && nextPage)
+            animationTime = (long)(400 * ((getWidth() - Math.abs(mCurPageOffset)))/getWidth());
+        else if(!quickScroll) {
+            animationTime = (long) (1000 * Math.min((getWidth() - Math.abs(mCurPageOffset)),Math.abs(mCurPageOffset))/getWidth());
+        }
+        else{
+            animationTime = (long)(400 * ( Math.abs(mCurPageOffset))/getWidth());
+        }
+
+//        animationTime = quickScroll?
+//                (long)(400 * ((getWidth() - Math.abs(mCurPageOffset)))/getWidth())
+//                :(long) (1000 * Math.min((getWidth() - Math.abs(mCurPageOffset)),Math.abs(mCurPageOffset))/getWidth());
 
         animation.setDuration(animationTime);
         animation.start();

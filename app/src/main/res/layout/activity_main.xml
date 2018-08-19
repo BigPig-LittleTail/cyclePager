@@ -7,11 +7,11 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <com.example.whz.testapplication.TestPager
+    <com.example.whz.testapplication.MyBetterPager
         android:id="@+id/myViewPager"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-    </com.example.whz.testapplication.TestPager>
+    </com.example.whz.testapplication.MyBetterPager>
 
 </android.support.constraint.ConstraintLayout>

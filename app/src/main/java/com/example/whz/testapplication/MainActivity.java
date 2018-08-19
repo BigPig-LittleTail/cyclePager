@@ -11,7 +11,7 @@ import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
-    private TestPager mMyPager;
+    private MyBetterPager mMyPager;
     private ArrayList<View> test = new ArrayList<>();
     private ListView listView;
     @Override
@@ -47,12 +47,13 @@ public class MainActivity extends AppCompatActivity {
         view3.setBackgroundColor(Color.YELLOW);
         view4 = new View(mMyPager.getContext());
         view4.setBackgroundColor(Color.GREEN);
-        //test.add(view0);
+        test.add(view0);
         test.add(view1);
         test.add(listView);
-      //  test.add(view2);
- //      test.add(view3);
-//        test.add(view4);
+        test.add(view2);
+        test.add(view3);
+        test.add(view4);
+
 
         mMyPager.setViewList(test);
 
